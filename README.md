@@ -5,6 +5,6 @@ Lets you export the entire filesystem stored for Eaglercraft 1.12.2 u2 running a
 
 I have only tested this on Chrome.
 
-Also, this was just a silly project, so there probably won't be too much support for this program in the future.
+Also, this was just a silly project, so there probably won't be too much support for this program in the future. Also, the code is kind of bad... sorry.
 
 This project uses [JSZip](https://github.com/Stuk/jszip).
