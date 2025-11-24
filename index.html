@@ -1,0 +1,125 @@
+<!DOCTYPE html>
+<html>
+<body>
+<button onclick="doit()">Export filesystem</button>
+
+<script src="jszip.js"></script>
+<script>
+function decodeName(name) {
+	function decodeHalf(b) {
+		return parseInt(b.split('').reverse().join(''), 16) - 1900000;
+	}
+
+	return [decodeHalf(name.substring(0,6)), decodeHalf(name.substring(6))];
+}
+
+// the following variables are scoped here for easy debugging
+let db;
+let filesystem_request;
+let filesystem;
+let anvil_files;
+
+function doit() {
+	const db_request = window.indexedDB.open("_net_lax1dude_eaglercraft_v1_8_internal_PlatformFilesystem_1_12_2_");
+
+	db_request.onsuccess = (event) => {
+		db = db_request.result;
+
+		filesystem_request = db.transaction("filesystem").objectStore("filesystem").getAll();
+
+		filesystem_request.onsuccess = (event) => {
+			filesystem = filesystem_request.result;
+
+			const zip = new JSZip();
+
+			anvil_files = [];
+
+			for (let i = 0; i < filesystem.length; i++) {
+				const file = filesystem[i];
+
+				const get_level0 = file.path.substring(file.path.length - 23);
+				if (get_level0.substring(0, 6) === "level0") {
+					const world_name = file.path.split('/')[2];
+
+					const chunk_data_name = get_level0.substring(7, 19);
+					const chunk_coords = decodeName(chunk_data_name);
+					console.log(chunk_data_name + " -> (" + chunk_coords + ")");
+
+					const anvil_file_name = "r." + (chunk_coords[0] >> 5) + "." + (chunk_coords[1] >> 5) + ".mca";
+
+					let anvil_file;
+					for (let fi = 0; fi < anvil_files.length; fi++) {
+						if (anvil_files[fi].name === anvil_file_name && anvil_files[fi].world === world_name) {
+							anvil_file = anvil_files[fi];
+							break;
+						}
+					}
+					if (anvil_file === undefined) {
+						anvil_file = {
+							name: anvil_file_name,
+							world: world_name,
+							bytes: new ArrayBuffer(8192)
+						};
+						anvil_files.push(anvil_file);
+					}
+
+					const chunk_and_method_length = file.data.byteLength + 1;
+					const payload_sectors = Math.ceil((chunk_and_method_length + 4) / 4096);
+					const payload_offset = anvil_file.bytes.byteLength / 4096;
+
+					const new_bytes = new ArrayBuffer(anvil_file.bytes.byteLength + payload_sectors * 4096);
+					const old_bytes_array = new Uint8Array(anvil_file.bytes);
+					const new_bytes_array = new Uint8Array(new_bytes);
+
+					new_bytes_array.set(old_bytes_array); // copy old data
+					new_bytes_array.set(
+						[
+							(payload_offset >> 16) & 255,
+							(payload_offset >> 8) & 255,
+							payload_offset & 255,
+							payload_sectors
+						],
+						4 * ((chunk_coords[0] & 31) + (chunk_coords[1] & 31) * 32)
+					); // copy payload location
+					new_bytes_array.set(
+						[
+							(chunk_and_method_length >> 24) & 255,
+							(chunk_and_method_length >> 16) & 255,
+							(chunk_and_method_length >> 8) & 255,
+							chunk_and_method_length & 255,
+							1
+						],
+						payload_offset * 4096
+					); // set chunk data size and compression method
+					new_bytes_array.set(new Uint8Array(file.data), (payload_offset * 4096) + 5); // copy chunk data
+
+					anvil_file.bytes = new_bytes;
+				} else {
+					zip.file(file.path, file.data);
+				}
+			}
+
+			for (let i = 0; i < anvil_files.length; i++) {
+				const anvil_file = anvil_files[i];
+				zip.file("eaglercraft/worlds/" + anvil_file.world + "/region/" + anvil_file.name, anvil_file.bytes);
+			}
+
+			const zip_file_promise = zip.generateAsync({type : "arraybuffer"});
+
+			zip_file_promise.then((result) => {
+				let data_url = URL.createObjectURL(new Blob([result]));
+				let link = document.createElement("a");
+				link.href = data_url;
+				link.download = "filesystem.zip";
+
+				link.click();
+				URL.revokeObjectURL(data_url);
+			});
+		};
+
+		db.close();
+	};
+}
+</script>
+</body>
+</html>
