@@ -5,6 +5,8 @@ Lets you export the entire filesystem stored for Eaglercraft 1.12.2 u2 running a
 
 I have only tested this on Chrome.
 
+Note that it can take a bit of time to load large exported worlds into vanilla Minecraft.
+
 Also, this was just a silly project, so there probably won't be too much support for this program in the future. Also, the code is kind of bad... sorry.
 
 This project uses [JSZip](https://github.com/Stuk/jszip).
